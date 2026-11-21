@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOLARA BAY — GTA 6 fan game</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1410; font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; user-select: none; }
+  .panel { position: absolute; background: rgba(12, 16, 26, 0.82); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; padding: 8px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.35); }
+  .gold { color: #f5b942; font-weight: 700; letter-spacing: 0.08em; font-size: 11px; }
+  /* mission card */
+  #mission { top: 12px; left: 12px; width: 300px; border-top: 3px solid #f5b942; }
+  #mission .stage-badge { display: inline-block; background: #f5b942; color: #111; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 3px; margin-right: 6px; }
+  #mission h1 { margin: 2px 0 1px; font-size: 21px; letter-spacing: 0.02em; }
+  #mission .obj { font-size: 12px; color: #dfe6ee; margin: 2px 0 5px; }
+  #mission .next { font-size: 11px; color: #9fd8ff; }
+  .bar { height: 6px; background: rgba(255,255,255,0.18); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: #f5b942; border-radius: 3px; }
+  /* police panel */
+  #police { top: 168px; left: 12px; width: 300px; }
+  #police .head { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 0.08em; color: #ff9d9d; font-weight: 700; }
+  #police table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 12px; }
+  #police td { padding: 2px 0; }
+  #police td.dist { text-align: right; color: #ffd97a; font-variant-numeric: tabular-nums; }
+  .role { display: inline-block; min-width: 74px; text-align: center; font-size: 10px; font-weight: 800; padding: 2px 0; border-radius: 3px; color: #111; }
+  .role.ram { background: #ff5b5b; } .role.pur { background: #f5b942; } .role.flk { background: #5db8ff; }
+  #police .foot { margin-top: 4px; font-size: 10px; color: #ffb3b3; letter-spacing: 0.05em; }
+  /* district + minimap */
+  #district { top: 386px; left: 12px; width: 180px; }
+  #district h2 { margin: 0; font-size: 17px; } #district .sub { font-size: 11px; color: #c9d4e0; }
+  #district .grip { font-size: 11px; margin-top: 4px; } #district .bar > i { background: #4ade80; }
+  #minimap { top: 478px; left: 12px; width: 168px; height: 168px; padding: 0; overflow: hidden; }
+  #minimap canvas { display: block; width: 168px; height: 168px; }
+  #vitals { top: 652px; left: 12px; width: 168px; font-size: 11px; }
+  #vitals .row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+  #vitals .row b { width: 48px; font-size: 10px; letter-spacing: 0.06em; }
+  #vitals .bar { flex: 1; margin: 0; } #vitals .bar > i { background: #4ade80; }
+  #vitals .bar.arm > i { background: #5db8ff; }
+  #vitals span { width: 26px; text-align: right; }
+  /* right column */
+  #cashbox { top: 12px; right: 12px; width: 210px; text-align: right; }
+  #cashbox .clock { font-size: 12px; color: #c9d4e0; }
+  #cash { font-size: 30px; font-weight: 800; color: #5df2a0; line-height: 1.05; }
+  #stars { font-size: 17px; letter-spacing: 3px; color: #f5b942; }
+  #stars .off { color: rgba(255,255,255,0.28); }
+  #rankline { font-size: 11px; color: #ffd97a; font-weight: 700; letter-spacing: 0.06em; }
+  #rankline .bar { margin-top: 3px; } #rankline .bar > i { background: #5db8ff; }
+  #weapons { position: absolute; top: 128px; right: 12px; width: 210px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: none; border: none; box-shadow: none; padding: 0; }
+  .wslot { background: rgba(12,16,26,0.82); border: 1px solid rgba(255,255,255,0.14); border-radius: 7px; padding: 6px 8px; font-size: 11px; }
+  .wslot.sel { border-color: #f5b942; box-shadow: 0 0 0 1px #f5b942; }
+  .wslot .k { float: right; font-size: 10px; color: #9fb2c8; border: 1px solid #556; border-radius: 3px; padding: 0 4px; }
+  .wslot .ammo { float: right; color: #ffd97a; font-weight: 700; }
+  .wslot .ic { font-size: 15px; }
+  #crew { position: absolute; top: 236px; right: 12px; width: 210px; display: flex; flex-direction: column; gap: 6px; background: none; border: none; box-shadow: none; padding: 0; }
+  .crewcard { display: flex; align-items: center; gap: 8px; background: rgba(12,16,26,0.82); border: 1px solid rgba(255,255,255,0.14); border-left: 3px solid #5db8ff; border-radius: 7px; padding: 6px 8px; }
+  .crewcard .face { width: 30px; height: 30px; border-radius: 50%; flex: none; position: relative; overflow: hidden; }
+  .crewcard .face::before { content: ""; position: absolute; left: 9px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: rgba(0,0,0,0.45); }
+  .crewcard .face::after { content: ""; position: absolute; left: 4px; top: 19px; width: 22px; height: 14px; border-radius: 10px 10px 0 0; background: rgba(0,0,0,0.45); }
+  .crewcard b { font-size: 12px; display: block; } .crewcard span { font-size: 10px; color: #c9d4e0; }
+  .crewcard .key { margin-left: auto; font-size: 11px; font-weight: 800; border: 1px solid #889; border-radius: 4px; padding: 2px 6px; }
+  /* bottom */
+  #dialogue { bottom: 12px; left: 50%; transform: translateX(-50%); width: 560px; display: flex; gap: 10px; align-items: flex-start; border-left: 3px solid #f5b942; }
+  #dialogue .face { width: 40px; height: 40px; border-radius: 6px; flex: none; position: relative; overflow: hidden; background: #2b6cb0; }
+  #dialogue .face::before { content: ""; position: absolute; left: 13px; top: 7px; width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.85); }
+  #dialogue .face::after { content: ""; position: absolute; left: 6px; top: 24px; width: 28px; height: 18px; border-radius: 12px 12px 0 0; background: rgba(255,255,255,0.85); }
+  #dialogue b { color: #7fd0ff; font-size: 13px; } #dialogue b i { color: #9fb2c8; font-style: normal; font-weight: 400; font-size: 11px; }
+  #dialogue p { margin: 2px 0 0; font-size: 13px; line-height: 1.35; }
+  #speedo { position: absolute; bottom: 12px; right: 12px; text-align: right; }
+  #speedo .spd { font-size: 46px; font-weight: 800; line-height: 0.95; }
+  #speedo .spd small { font-size: 14px; color: #c9d4e0; }
+  #speedo .veh { color: #7fd0ff; font-weight: 700; font-size: 14px; }
+  #speedo .tune { font-size: 11px; color: #c9d4e0; }
+  #speedo .cond { font-size: 11px; margin-top: 2px; } #speedo .cond .bar { display: inline-block; width: 130px; vertical-align: middle; } #speedo .cond .bar > i { background: #f5b942; }
+  #radio { margin-top: 4px; font-size: 11px; background: rgba(12,16,26,0.82); border: 1px solid rgba(255,255,255,0.14); border-radius: 20px; padding: 3px 10px; display: inline-block; }
+  #cross { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 22px; color: rgba(255,255,255,0.9); text-shadow: 0 0 4px #000; display: none; }
+  #banner { position: absolute; left: 50%; top: 34%; transform: translate(-50%,-50%); text-align: center; display: none; }
+  #banner h1 { font-size: 44px; margin: 0; color: #f5b942; text-shadow: 0 3px 12px rgba(0,0,0,0.7); letter-spacing: 0.04em; }
+  #banner p { font-size: 17px; margin: 4px 0 0; text-shadow: 0 2px 8px #000; }
+  #toast { position: absolute; left: 50%; top: 76px; transform: translateX(-50%); background: rgba(12,16,26,0.9); border: 1px solid #f5b942; border-radius: 6px; padding: 6px 14px; font-size: 13px; display: none; }
+  #help { position: absolute; left: 12px; bottom: 12px; font-size: 11px; color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px #000; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="hud">
+  <div class="panel" id="mission">
+    <span class="gold" id="m-chapter">CH.1 &middot; LOW TIDE</span><br>
+    <span class="stage-badge" id="m-stage">STAGE 1/3</span>
+    <h1 id="m-title">FIRST SCORE</h1>
+    <div class="bar"><i id="m-bar" style="width:0%"></i></div>
+    <div class="obj" id="m-obj">Drive to the deal on Strand Blvd</div>
+    <div class="next" id="m-next">NEXT Pick up the package</div>
+  </div>
+  <div class="panel" id="police">
+    <div class="head"><span>SBP RESPONSE</span><span id="p-count">2 UNITS</span></div>
+    <table id="p-table"></table>
+    <div class="foot" id="p-foot">UNITS RESPONDING</div>
+  </div>
+  <div class="panel" id="district">
+    <h2 id="d-name">KUMALA STRAND</h2>
+    <div class="sub" id="d-sub">Strand Boulevard &middot; Beachfront strip</div>
+    <div class="grip">GRIP <span id="d-grip">58%</span></div>
+    <div class="bar"><i id="d-bar" style="width:58%"></i></div>
+  </div>
+  <div class="panel" id="minimap"><canvas id="mm" width="168" height="168"></canvas></div>
+  <div class="panel" id="vitals">
+    <div class="row"><b>HEALTH</b><div class="bar"><i id="v-hp" style="width:100%"></i></div><span id="v-hp-n">100</span></div>
+    <div class="row"><b>ARMOUR</b><div class="bar arm"><i id="v-ar" style="width:40%"></i></div><span id="v-ar-n">40</span></div>
+  </div>
+  <div class="panel" id="cashbox">
+    <div class="clock" id="clock">16:00</div>
+    <div id="cash">$18,450</div>
+    <div id="stars"></div>
+    <div id="rankline"><span id="rank-name">FIXER</span> &nbsp; <span id="rank-xp">3,900 / 5,000 XP</span><div class="bar"><i id="rank-bar" style="width:78%"></i></div></div>
+  </div>
+  <div id="weapons"></div>
+  <div id="crew"></div>
+  <div class="panel" id="dialogue">
+    <div class="face" id="dlg-face"></div>
+    <div><b id="dlg-name">MIRA KESANG <i>Crew &middot; Driver</i></b><p id="dlg-text">Deal's on the Strand. Drive smooth, Tomo — the SBP is already sniffing around.</p></div>
+  </div>
+  <div id="speedo">
+    <div class="spd"><span id="spd">0</span> <small>KM/H</small></div>
+    <div class="veh" id="veh">RUKAN PELO GT</div>
+    <div class="tune" id="tune">TUNE 3 &middot; SPORTS</div>
+    <div class="cond">CONDITION <span class="bar"><i id="cond-bar" style="width:88%"></i></span> <span id="cond-n">88% CLEAN</span></div>
+    <div id="radio">&#9834; RADIO OMBO 98.4 &mdash; Tide Runner &mdash; Sol Mara</div>
+  </div>
+  <div id="cross">+</div>
+  <div id="banner"><h1 id="banner-h">MISSION COMPLETE</h1><p id="banner-p"></p></div>
+  <div id="toast"></div>
+  <div id="help">WASD drive &middot; E enter / exit car &middot; 1-4 weapons &middot; Z / X / C crew &middot; R restart mission</div>
+</div>
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
