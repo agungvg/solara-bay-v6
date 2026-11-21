@@ -189,13 +189,17 @@ function clampWorld(v) { return Math.max(-168, Math.min(168, v)); }
 
 function driveCar(dt, throttle, steer) {
   const c = state.car;
-  const accel = 14, brake = 26, drag = 0.35, maxF = 34, maxR = -10;
+  const accel = 14, brake = 26, maxF = 34, maxR = -10;
   if (throttle > 0) c.speed += accel * throttle * dt;
   else if (throttle < 0) c.speed -= brake * dt;
-  else c.speed -= Math.sign(c.speed) * drag * 6 * dt;
+  // Rolling drag, always on: without it the car only ever accelerates while
+  // throttling, so a small throttle still ends at 122 km/h and every
+  // 90-degree turn overshoots into the buildings. Equilibrium speed is
+  // 14 * throttle / 0.41, i.e. 34 m/s at full throttle, ~8 m/s at 0.25.
+  c.speed -= c.speed * 0.41 * dt;
   if (Math.abs(c.speed) < 0.2 && throttle === 0) c.speed = 0;
   c.speed = Math.max(maxR, Math.min(maxF, c.speed));
-  const turn = steer * 1.9 * dt * Math.min(1, Math.abs(c.speed) / 8) * Math.sign(c.speed || 1);
+  const turn = steer * 1.9 * dt * Math.min(1, 0.35 + Math.abs(c.speed) / 10) * Math.sign(c.speed || 1);
   c.heading += turn;
   const nx = c.x + Math.cos(c.heading) * c.speed * dt;
   const nz = c.z + Math.sin(c.heading) * c.speed * dt;
@@ -230,8 +234,14 @@ function updateTraffic(dt) {
 }
 
 function updatePolice(dt) {
+  // Live play: the number of units on the street scales with the wanted
+  // level (2 at wanted 1, up to all 7 at wanted 5+). Shot presets place
+  // their own units and freeze the sim, so this never touches a screenshot.
+  const active = Math.min(state.police.length, state.wanted + 1);
+  state.police.forEach((u, i) => { u.mesh.visible = i < active; });
   const p = state.player;
   for (const u of state.police) {
+    if (!u.mesh.visible) continue;
     const dx = p.x - u.x, dz = p.z - u.z;
     const d = Math.hypot(dx, dz) || 1;
     const want = Math.atan2(dz, dx);
@@ -247,9 +257,9 @@ function updatePolice(dt) {
     if (!collideBuildings(u.x, nz, 2.2)) u.z = nz;
     u.mesh.position.set(u.x, 0, u.z);
     u.mesh.rotation.y = -u.heading;
-    // ramming contact
+    // ramming contact (light damage — a full surround still lets you escape)
     if (d < 4.5 && state.player.inCar && state.mode === 'playing') {
-      state.condition = Math.max(0, state.condition - 6 * dt);
+      state.condition = Math.max(0, state.condition - 2.5 * dt);
       state.car.speed *= (1 - 0.6 * dt);
     }
     // light bar flash

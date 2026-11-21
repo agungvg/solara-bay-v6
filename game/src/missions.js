@@ -183,25 +183,34 @@ export function autopilot(state, dt) {
   // In the car, follow the road grid; on foot, walk straight at the target
   // (the kiosk / stall is metres off the road on open ground — road routing
   // would drag a walker east along the avenue forever).
-  if (p.inCar) return driveWaypoints(state, target.x, target.z);
+  if (p.inCar) return driveWaypoints(state, target.x, target.z, st.kind === 'ram' ? 'ram' : null);
   return steerToward(state, target.x, target.z, true);
 }
 
 // Driving uses the road grid: nearest horizontal road, then the vertical road
 // nearest the target, then the horizontal road nearest the target, then the
 // target itself. Straight-line driving cuts through building blocks.
-function driveWaypoints(state, tx, tz) {
+// The route is STATEFUL (kept on state.route): once a waypoint is reached
+// the car never goes back to it. A stateless "first waypoint over 8 m away"
+// flip-flops at the corner — the car oscillates around (-40, 120) forever,
+// steering south to the road it just left, then north again, and never
+// commits to the turn.
+function driveWaypoints(state, tx, tz, keyOverride) {
   const p = state.player;
+  const key = keyOverride ?? (tx + ',' + tz);
   const roads = [-120, -40, 40, 120];
   const nearest = (v) => roads.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));
-  const zr = nearest(p.z);
-  const xr = nearest(tx);
-  const ztr = nearest(tz);
-  const wps = [[p.x, zr], [xr, zr], [xr, ztr], [tx, tz]];
-  let wp = wps[wps.length - 1];
-  for (const w of wps) {
-    if (Math.hypot(w[0] - p.x, w[1] - p.z) > 5) { wp = w; break; }
+  if (!state.route || state.route.key !== key) {
+    const zr = nearest(p.z);
+    const xr = nearest(tx);
+    const ztr = nearest(tz);
+    state.route = { key, wps: [[p.x, zr], [xr, zr], [xr, ztr], [tx, tz]], i: 0 };
   }
+  const r = state.route;
+  while (r.i < r.wps.length - 1 && Math.hypot(r.wps[r.i][0] - p.x, r.wps[r.i][1] - p.z) < 8) r.i++;
+  // Final leg always tracks the live target (the Regent moves).
+  if (r.i >= r.wps.length - 1) return steerToward(state, tx, tz, false);
+  const wp = r.wps[r.i];
   return steerToward(state, wp[0], wp[1], false);
 }
 
@@ -213,6 +222,20 @@ function steerToward(state, tx, tz, onFoot) {
   while (diff > Math.PI) diff -= Math.PI * 2;
   while (diff < -Math.PI) diff += Math.PI * 2;
   const d = Math.hypot(dx, dz);
-  const throttle = d < 4 ? 0.35 : (Math.abs(diff) > 1.2 ? 0.25 : 1);
+  // Speed control for driving: the car brakes for the waypoint and for big
+  // turns instead of arriving at 122 km/h and arcing into the buildings.
+  // Desired speed grows with distance to the point (about 8 m/s at a turn,
+  // full speed on a long straight). On foot the old simple throttle applies.
+  let throttle;
+  if (onFoot) {
+    throttle = d < 4 ? 0.35 : (Math.abs(diff) > 1.2 ? 0.25 : 1);
+  } else {
+    const wantSpeed = Math.min(34, 4 + d * 0.45);
+    const cur = Math.abs(state.car.speed);
+    if (Math.abs(diff) > 0.9) throttle = cur > 6 ? -0.8 : 0.3;
+    else if (cur > wantSpeed + 2) throttle = -0.6;
+    else if (cur < wantSpeed - 2) throttle = 1;
+    else throttle = 0.4;
+  }
   return { throttle, steer: Math.max(-1, Math.min(1, diff * 1.6)), wantExit: false, wantEnter: false };
 }
